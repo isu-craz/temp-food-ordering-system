@@ -1,0 +1,562 @@
+import React, { useState, useEffect } from 'react';
+import axiosClient from '../../api/axiosClient';
+import StatusBadge from '../../components/StatusBadge';
+import { UtensilsCrossed, Plus, Search, Layers, CheckCircle, XCircle, Trash2, Edit3, Image as ImageIcon, Sparkles, Filter } from 'lucide-react';
+
+export default function MenuManagement() {
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(1);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [menuItems, setMenuItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modals
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [showVariationModal, setShowVariationModal] = useState(false);
+  const [selectedItemForVariation, setSelectedItemForVariation] = useState(null);
+
+  // Form states
+  const [newCategory, setNewCategory] = useState({ categoryName: '', description: '' });
+  const [newItem, setNewItem] = useState({
+    categoryId: '',
+    foodName: '',
+    description: '',
+    basePrice: '',
+    imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
+  });
+  const [newVariation, setNewVariation] = useState({ variationName: '', additionalPrice: 0 });
+
+  useEffect(() => {
+    fetchBranches();
+  }, []);
+
+  useEffect(() => {
+    if (selectedBranchId) {
+      setSelectedCategory('ALL');
+      loadBranchMenu();
+    }
+  }, [selectedBranchId]);
+
+  const fetchBranches = async () => {
+    try {
+      const res = await axiosClient.get('/branches?onlyActive=false');
+      if (res.success && res.data && res.data.length > 0) {
+        setBranches(res.data);
+        setSelectedBranchId(res.data[0].branchId);
+      }
+    } catch (err) {
+      console.error('Error fetching branches:', err);
+    }
+  };
+
+  const loadBranchMenu = async () => {
+    try {
+      setLoading(true);
+      const [catRes, itemRes] = await Promise.all([
+        axiosClient.get(`/branches/${selectedBranchId}/categories?onlyActive=false`),
+        axiosClient.get(`/branches/${selectedBranchId}/menu-items?onlyActive=false`),
+      ]);
+      if (catRes.success && catRes.data) setCategories(catRes.data);
+      if (itemRes.success && itemRes.data) setMenuItems(itemRes.data);
+    } catch (err) {
+      console.error('Error loading branch menu:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axiosClient.post('/categories', {
+        branchId: selectedBranchId,
+        ...newCategory,
+      });
+      if (res.success) {
+        setShowCategoryModal(false);
+        setNewCategory({ categoryName: '', description: '' });
+        alert('Food Category Created Successfully!');
+        loadBranchMenu();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error creating category');
+    }
+  };
+
+  const handleCreateItem = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axiosClient.post('/menu-items', {
+        branchId: selectedBranchId,
+        categoryId: Number(newItem.categoryId),
+        foodName: newItem.foodName,
+        description: newItem.description,
+        basePrice: Number(newItem.basePrice),
+        imageUrl: newItem.imageUrl,
+      });
+      if (res.success) {
+        setShowItemModal(false);
+        setNewItem({
+          categoryId: '',
+          foodName: '',
+          description: '',
+          basePrice: '',
+          imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
+        });
+        alert('Menu Item Created Successfully!');
+        loadBranchMenu();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error creating menu item');
+    }
+  };
+
+  const handleToggleAvailability = async (itemId, currentAvailability) => {
+    const isAvail = currentAvailability !== false;
+    const nextAvailability = !isAvail;
+    try {
+      const res = await axiosClient.patch(`/menu-items/${itemId}/availability?isAvailable=${nextAvailability}`);
+      if (res.success) {
+        loadBranchMenu();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error toggling availability');
+    }
+  };
+
+  const handleAddVariation = async (e) => {
+    e.preventDefault();
+    if (!selectedItemForVariation) return;
+    try {
+      const res = await axiosClient.post(`/menu-items/${selectedItemForVariation.itemId}/variations`, newVariation);
+      if (res.success) {
+        setShowVariationModal(false);
+        setNewVariation({ variationName: '', additionalPrice: 0 });
+        alert('Size/Portion Variation Added!');
+        loadBranchMenu();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error adding variation');
+    }
+  };
+
+  const handleDeleteVariation = async (variationId) => {
+    if (!window.confirm('Delete this size variation?')) return;
+    try {
+      const res = await axiosClient.delete(`/variations/${variationId}`);
+      if (res.success) {
+        loadBranchMenu();
+      }
+    } catch (err) {
+      alert('Error deleting variation');
+    }
+  };
+
+  const filteredItems = menuItems.filter((item) => {
+    const matchesSearch =
+      item.foodName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory =
+      selectedCategory === 'ALL' || item.categoryId === Number(selectedCategory);
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 rounded bg-orange-100 text-orange-900 text-[10px] font-extrabold uppercase">
+              Member 2 Module
+            </span>
+            <h1 className="text-2xl font-black text-stone-900">Branch Menu & Variations</h1>
+          </div>
+          <p className="text-xs text-stone-600">
+            Manage categories, menu items, dynamic size pricing, and live availability.
+          </p>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="text-xs font-bold text-stone-600">Select Branch:</label>
+          <select
+            value={selectedBranchId}
+            onChange={(e) => setSelectedBranchId(Number(e.target.value))}
+            className="px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          >
+            {branches.map((b) => (
+              <option key={b.branchId} value={b.branchId}>
+                {b.branchName}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs flex items-center gap-1"
+          >
+            <Plus className="w-3.5 h-3.5" /> New Category
+          </button>
+          <button
+            onClick={() => setShowItemModal(true)}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Add Food Item
+          </button>
+        </div>
+      </div>
+
+      {/* 🏷️ CLICKABLE CATEGORIES FILTER TABS & SEARCH */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
+          {/* All Categories Button */}
+          <button
+            onClick={() => setSelectedCategory('ALL')}
+            className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              selectedCategory === 'ALL'
+                ? 'bg-stone-900 text-white shadow-sm ring-2 ring-stone-900/20'
+                : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            All Categories ({menuItems.length})
+          </button>
+
+          {/* Individual Category Filter Buttons */}
+          {categories.map((c) => {
+            const isSelected = selectedCategory === c.categoryId;
+            const categoryItemCount = menuItems.filter(m => m.categoryId === c.categoryId).length;
+            return (
+              <button
+                key={c.categoryId}
+                onClick={() => setSelectedCategory(c.categoryId)}
+                className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20 ring-2 ring-orange-500/30'
+                    : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:border-stone-300'
+                }`}
+              >
+                <span>{c.categoryName}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  isSelected ? 'bg-orange-700 text-white' : 'bg-stone-100 text-stone-500'
+                }`}>
+                  {categoryItemCount}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search food items..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-white border border-stone-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+          />
+        </div>
+      </div>
+
+      {/* Menu Item Cards Grid */}
+      {loading ? (
+        <div className="py-20 text-center text-stone-500">Loading menu catalog...</div>
+      ) : filteredItems.length === 0 ? (
+        <div className="bg-white p-12 text-center text-stone-400 rounded-3xl border border-stone-200">
+          <p className="font-bold text-stone-700 mb-1">No items found in this category.</p>
+          <p className="text-xs text-stone-500">Click "Add Food Item" above or select "All Categories".</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredItems.map((item) => {
+            const isItemAvailable = item.isAvailable !== false && item.available !== false;
+            return (
+              <div
+                key={item.itemId}
+                className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="relative h-44 rounded-2xl overflow-hidden mb-4 bg-stone-100">
+                    <img
+                      src={item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'}
+                      alt={item.foodName}
+                      className={`w-full h-full object-cover transition-all ${
+                        !isItemAvailable ? 'grayscale opacity-60' : ''
+                      }`}
+                    />
+                    <div className="absolute top-3 right-3">
+                      <span
+                        className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full shadow-sm ${
+                          isItemAvailable ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                        }`}
+                      >
+                        {isItemAvailable ? 'In Stock' : 'Out of Stock'}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-3 left-3">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-sm">
+                        {item.categoryName}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-bold text-stone-900 text-sm">{item.foodName}</h3>
+                    <span className="font-black text-orange-600 text-sm whitespace-nowrap">
+                      LKR {Number(item.basePrice).toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500 line-clamp-2 mb-4">{item.description}</p>
+
+                  {/* Variations Section */}
+                  <div className="pt-3 border-t border-stone-100 mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider">
+                        Portion Variations ({item.variations ? item.variations.length : 0})
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSelectedItemForVariation(item);
+                          setShowVariationModal(true);
+                        }}
+                        className="text-[10px] font-bold text-orange-600 hover:text-orange-700 underline flex items-center gap-0.5"
+                      >
+                        <Plus className="w-3 h-3" /> Add Size
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      {item.variations && item.variations.length > 0 ? (
+                        item.variations.map((v) => (
+                          <div
+                            key={v.variationId}
+                            className="flex items-center justify-between bg-stone-50 px-2.5 py-1.5 rounded-xl text-xs"
+                          >
+                            <span className="font-medium text-stone-700">{v.variationName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-stone-900 text-[11px]">
+                                +LKR {Number(v.additionalPrice).toFixed(2)}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteVariation(v.variationId)}
+                                className="text-rose-400 hover:text-rose-600 p-0.5"
+                                title="Remove variation"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[11px] text-stone-400 italic">No size variations configured.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Bottom Controls */}
+                <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
+                  <span className="text-[10px] font-medium text-stone-400">
+                    ID: #{item.itemId}
+                  </span>
+                  <button
+                    onClick={() => handleToggleAvailability(item.itemId, isItemAvailable)}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                      isItemAvailable
+                        ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {isItemAvailable ? 'Mark Out of Stock' : 'Mark In Stock'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal: New Category */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-sm w-full rounded-3xl p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-stone-900 mb-3">Create Food Category</h3>
+            <form onSubmit={handleCreateCategory} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Category Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newCategory.categoryName}
+                  onChange={(e) => setNewCategory({ ...newCategory, categoryName: e.target.value })}
+                  placeholder="e.g. Pasta & Lasagna"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Description</label>
+                <textarea
+                  rows="2"
+                  value={newCategory.description}
+                  onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                  placeholder="Fresh oven-baked Italian pastas"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(false)}
+                  className="px-3 py-1.5 bg-stone-100 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="px-3 py-1.5 bg-orange-600 text-white rounded-xl font-bold">
+                  Create Category
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: New Item */}
+      {showItemModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-lg w-full rounded-3xl p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-stone-900 mb-4">Add New Food Item</h3>
+            <form onSubmit={handleCreateItem} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Category</label>
+                <select
+                  required
+                  value={newItem.categoryId}
+                  onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value })}
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                >
+                  <option value="">-- Choose Category --</option>
+                  {categories.map((c) => (
+                    <option key={c.categoryId} value={c.categoryId}>
+                      {c.categoryName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Food Item Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newItem.foodName}
+                  onChange={(e) => setNewItem({ ...newItem, foodName: e.target.value })}
+                  placeholder="e.g. Crispy Fried Chicken Burger"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Description</label>
+                <textarea
+                  rows="2"
+                  value={newItem.description}
+                  onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                  placeholder="Crispy fried chicken breast with garlic mayo..."
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Base Price (LKR)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    required
+                    value={newItem.basePrice}
+                    onChange={(e) => setNewItem({ ...newItem, basePrice: e.target.value })}
+                    placeholder="1200.00"
+                    className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Image URL</label>
+                  <input
+                    type="url"
+                    value={newItem.imageUrl}
+                    onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
+                    placeholder="https://images.unsplash.com/..."
+                    className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowItemModal(false)}
+                  className="px-3 py-1.5 bg-stone-100 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="px-3 py-1.5 bg-orange-600 text-white rounded-xl font-bold">
+                  Save Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: New Variation */}
+      {showVariationModal && selectedItemForVariation && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-sm w-full rounded-3xl p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-stone-900 mb-1">Add Portion Variation</h3>
+            <p className="text-xs text-stone-500 mb-3">Item: {selectedItemForVariation.foodName}</p>
+            <form onSubmit={handleAddVariation} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Variation Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newVariation.variationName}
+                  onChange={(e) => setNewVariation({ ...newVariation, variationName: e.target.value })}
+                  placeholder="e.g. Large (12-inch)"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">Additional Price (LKR)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  value={newVariation.additionalPrice}
+                  onChange={(e) => setNewVariation({ ...newVariation, additionalPrice: Number(e.target.value) })}
+                  placeholder="500.00"
+                  className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowVariationModal(false)}
+                  className="px-3 py-1.5 bg-stone-100 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="px-3 py-1.5 bg-orange-600 text-white rounded-xl font-bold">
+                  Add Variation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
