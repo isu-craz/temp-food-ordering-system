@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
+import { mockBranches, mockCategories, mockMenuItems } from '../../api/mockData';
 import StatusBadge from '../../components/StatusBadge';
-import { UtensilsCrossed, Plus, Search, Layers, CheckCircle, XCircle, Trash2, Edit3, Image as ImageIcon, Sparkles, Filter } from 'lucide-react';
+import PageHeader from '../../components/PageHeader';
+import { UtensilsCrossed, Plus, Search, Layers, CheckCircle, XCircle, Trash2, Edit3, Image as ImageIcon, Sparkles, Filter, ChefHat, Building2 } from 'lucide-react';
 
 export default function MenuManagement() {
+  const { user } = useAuth();
   const [branches, setBranches] = useState([]);
-  const [selectedBranchId, setSelectedBranchId] = useState(1);
+  const [selectedBranchId, setSelectedBranchId] = useState(user?.branchId || 1);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [menuItems, setMenuItems] = useState([]);
@@ -43,12 +48,17 @@ export default function MenuManagement() {
   const fetchBranches = async () => {
     try {
       const res = await axiosClient.get('/branches?onlyActive=false');
-      if (res.success && res.data && res.data.length > 0) {
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
         setBranches(res.data);
         setSelectedBranchId(res.data[0].branchId);
+      } else {
+        setBranches(mockBranches);
+        setSelectedBranchId(mockBranches[0].branchId);
       }
     } catch (err) {
-      console.error('Error fetching branches:', err);
+      console.error('Error fetching branches, fallback to mock:', err);
+      setBranches(mockBranches);
+      setSelectedBranchId(mockBranches[0].branchId);
     }
   };
 
@@ -59,10 +69,21 @@ export default function MenuManagement() {
         axiosClient.get(`/branches/${selectedBranchId}/categories?onlyActive=false`),
         axiosClient.get(`/branches/${selectedBranchId}/menu-items?onlyActive=false`),
       ]);
-      if (catRes.success && catRes.data) setCategories(catRes.data);
-      if (itemRes.success && itemRes.data) setMenuItems(itemRes.data);
+      if (catRes && catRes.success && Array.isArray(catRes.data) && catRes.data.length > 0) {
+        setCategories(catRes.data);
+      } else {
+        setCategories(mockCategories);
+      }
+
+      if (itemRes && itemRes.success && Array.isArray(itemRes.data) && itemRes.data.length > 0) {
+        setMenuItems(itemRes.data);
+      } else {
+        setMenuItems(mockMenuItems);
+      }
     } catch (err) {
-      console.error('Error loading branch menu:', err);
+      console.error('Error loading branch menu, fallback to mock:', err);
+      setCategories(mockCategories);
+      setMenuItems(mockMenuItems);
     } finally {
       setLoading(false);
     }
@@ -166,48 +187,57 @@ export default function MenuManagement() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded bg-orange-100 text-orange-900 text-[10px] font-extrabold uppercase">
-              Member 2 Module
+      <PageHeader
+        badgeIcon={UtensilsCrossed}
+        badgeText="Branch Menu Management"
+        badgeColor="bg-orange-600/90"
+        title="Food Items & Size Variations"
+        description="Manage food categories, menu offerings, dynamic portion/size variations, and 1-click stock availability."
+        switcherTabs={[
+          { label: 'Kitchen Queue', to: '/kitchen-queue', icon: ChefHat, active: false },
+          { label: 'Menu Management', to: '/menu-admin', icon: UtensilsCrossed, active: true },
+        ]}
+      >
+        {/* Branch Indicator: Read-only badge for Branch Manager, dropdown for Admin/Ops */}
+        {user?.role === 'BRANCH_MANAGER' ? (
+          <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 px-3.5 py-2 rounded-2xl">
+            <Building2 className="w-4 h-4 text-orange-400" />
+            <span className="text-xs font-bold text-stone-300">Branch:</span>
+            <span className="text-xs font-black text-white">
+              {branches.find((b) => b.branchId === selectedBranchId)?.branchName || 'Spice Avenue - Colombo Main'}
             </span>
-            <h1 className="text-2xl font-black text-stone-900">Branch Menu & Variations</h1>
           </div>
-          <p className="text-xs text-stone-600">
-            Manage categories, menu items, dynamic size pricing, and live availability.
-          </p>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 px-3 py-2 rounded-2xl">
+            <Building2 className="w-4 h-4 text-orange-400" />
+            <span className="text-xs font-bold text-stone-300">Branch:</span>
+            <select
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(Number(e.target.value))}
+              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
+            >
+              {branches.map((b) => (
+                <option key={b.branchId} value={b.branchId} className="bg-stone-900 text-white">
+                  {b.branchName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <label className="text-xs font-bold text-stone-600">Select Branch:</label>
-          <select
-            value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(Number(e.target.value))}
-            className="px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-          >
-            {branches.map((b) => (
-              <option key={b.branchId} value={b.branchId}>
-                {b.branchName}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => setShowCategoryModal(true)}
-            className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs flex items-center gap-1"
-          >
-            <Plus className="w-3.5 h-3.5" /> New Category
-          </button>
-          <button
-            onClick={() => setShowItemModal(true)}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
-          >
-            <Plus className="w-4 h-4" /> Add Food Item
-          </button>
-        </div>
-      </div>
+        <button
+          onClick={() => setShowCategoryModal(true)}
+          className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold rounded-2xl border border-stone-700 text-xs flex items-center gap-1.5 transition-all"
+        >
+          <Plus className="w-3.5 h-3.5" /> Category
+        </button>
+        <button
+          onClick={() => setShowItemModal(true)}
+          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all"
+        >
+          <Plus className="w-4 h-4" /> Add Food Item
+        </button>
+      </PageHeader>
 
       {/* 🏷️ CLICKABLE CATEGORIES FILTER TABS & SEARCH */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">

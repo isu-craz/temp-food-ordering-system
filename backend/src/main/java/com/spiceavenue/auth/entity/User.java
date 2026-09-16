@@ -1,5 +1,6 @@
 package com.spiceavenue.auth.entity;
 
+import com.spiceavenue.common.enums.EntityStatus;
 import com.spiceavenue.common.enums.RiderStatus;
 import com.spiceavenue.common.enums.UserRole;
 import jakarta.persistence.*;
@@ -39,6 +40,11 @@ public class User {
     @Column(nullable = false)
     @Builder.Default
     private UserRole role = UserRole.CUSTOMER;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private EntityStatus status = EntityStatus.ACTIVE;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "rider_status", nullable = false)

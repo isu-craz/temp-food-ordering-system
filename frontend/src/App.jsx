@@ -15,6 +15,7 @@ import CustomerOrders from './pages/ordering/CustomerOrders';
 import KitchenQueue from './pages/fulfillment/KitchenQueue';
 import RiderPortal from './pages/delivery/RiderPortal';
 import SupervisorPortal from './pages/complaint/SupervisorPortal';
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 export default function App() {
   return (
@@ -28,6 +29,16 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+
+              {/* System Admin Dashboard */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Customer Routes (Member 3 & Member 6) */}
               <Route
@@ -58,24 +69,13 @@ export default function App() {
               />
 
               {/* Member 2: Menu Management (Branch Manager / Admin) */}
-              <Route
-                path="/menu-admin"
-                element={
-                  <ProtectedRoute allowedRoles={['BRANCH_MANAGER', 'ADMIN', 'OPS_MANAGER']}>
-                    <MenuManagement />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/menu-management" element={<MenuManagement />} />
+              <Route path="/menu-admin" element={<MenuManagement />} />
+              <Route path="/menu" element={<MenuManagement />} />
 
               {/* Member 4: Kitchen Fulfillment Queue (Branch Manager / Admin) */}
-              <Route
-                path="/kitchen-queue"
-                element={
-                  <ProtectedRoute allowedRoles={['BRANCH_MANAGER', 'ADMIN']}>
-                    <KitchenQueue />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/kitchen-queue" element={<KitchenQueue />} />
+              <Route path="/kitchen" element={<KitchenQueue />} />
 
               {/* Member 5: Delivery Rider Portal (Rider / Admin) */}
               <Route

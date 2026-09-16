@@ -23,8 +23,10 @@ export default function Login() {
         case 'BRANCH_MANAGER':
           navigate('/kitchen-queue');
           break;
-        case 'OPS_MANAGER':
         case 'ADMIN':
+          navigate('/admin');
+          break;
+        case 'OPS_MANAGER':
           navigate('/branches');
           break;
         case 'RIDER':

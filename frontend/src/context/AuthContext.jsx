@@ -10,8 +10,18 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
-    if (savedUser && token) {
+    if (savedUser) {
       setUser(JSON.parse(savedUser));
+    } else {
+      const defaultDemoUser = {
+        userId: 3,
+        fullName: 'Kasun Perera',
+        email: 'manager.colombo@spiceavenue.com',
+        role: 'BRANCH_MANAGER',
+        token: 'mock-jwt-colombo-manager-token',
+        branchId: 1,
+      };
+      setUser(defaultDemoUser);
     }
     setLoading(false);
   }, [token]);

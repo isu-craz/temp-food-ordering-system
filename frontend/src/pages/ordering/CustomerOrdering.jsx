@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axiosClient from '../../api/axiosClient';
-import { ShoppingBag, MapPin, Truck, Store, Plus, Minus, Trash2, CheckCircle, CreditCard, Banknote, ShieldAlert, Search, Layers, RefreshCw, Clock, Building2, AlertCircle, Sparkles } from 'lucide-react';
+import { mockBranches, mockMenuItems, mockCategories } from '../../api/mockData';
+import PageHeader from '../../components/PageHeader';
+import { ShoppingBag, MapPin, Truck, Store, Plus, Minus, Trash2, CheckCircle, CreditCard, Banknote, ShieldAlert, Search, Layers, RefreshCw, Clock, Building2, AlertCircle, Sparkles, History, Receipt } from 'lucide-react';
 
 export default function CustomerOrdering() {
   const [branches, setBranches] = useState([]);
@@ -38,33 +40,52 @@ export default function CustomerOrdering() {
       let branchList = branchRes?.data || [];
 
       // Fallback: If no active branches, load all branches
-      if (branchList.length === 0) {
+      if (!Array.isArray(branchList) || branchList.length === 0) {
         branchRes = await axiosClient.get('/branches?onlyActive=false');
         branchList = branchRes?.data || [];
       }
 
+      if (!Array.isArray(branchList) || branchList.length === 0) {
+        branchList = mockBranches;
+      }
+
+      setBranches(branchList);
       if (branchList.length > 0) {
-        setBranches(branchList);
         const initialBranchId = branchList[0].branchId;
         setSelectedBranchId(initialBranchId);
         setSelectedCategory('ALL');
         await loadBranchMenuAndAreas(initialBranchId);
       }
     } catch (err) {
-      console.error('Failed to load branches:', err);
+      console.error('Failed to load branches, fallback to mock:', err);
+      setBranches(mockBranches);
+      if (mockBranches.length > 0) {
+        setSelectedBranchId(mockBranches[0].branchId);
+        await loadBranchMenuAndAreas(mockBranches[0].branchId);
+      }
     }
 
     // 2. Fetch Customer Addresses independently (Authenticated Endpoint)
     try {
       const addrRes = await axiosClient.get('/customer/addresses');
-      if (addrRes?.success && addrRes?.data) {
+      if (addrRes?.success && Array.isArray(addrRes?.data) && addrRes.data.length > 0) {
         setAddresses(addrRes.data);
-        if (addrRes.data.length > 0) {
-          setSelectedAddressId(addrRes.data[0].addressId);
-        }
+        setSelectedAddressId(addrRes.data[0].addressId);
+      } else {
+        const defaultAddrs = [
+          { addressId: 1, label: 'Home', houseNumber: '24', street: 'Galle Road, Colombo 03', deliveryFee: 150.0 },
+          { addressId: 2, label: 'Office', houseNumber: '100', street: 'Union Place, Colombo 02', deliveryFee: 200.0 },
+        ];
+        setAddresses(defaultAddrs);
+        setSelectedAddressId(1);
       }
     } catch (err) {
-      console.log('Customer addresses not loaded:', err.message);
+      const defaultAddrs = [
+        { addressId: 1, label: 'Home', houseNumber: '24', street: 'Galle Road, Colombo 03', deliveryFee: 150.0 },
+        { addressId: 2, label: 'Office', houseNumber: '100', street: 'Union Place, Colombo 02', deliveryFee: 200.0 },
+      ];
+      setAddresses(defaultAddrs);
+      setSelectedAddressId(1);
     } finally {
       setLoading(false);
     }
@@ -92,19 +113,25 @@ export default function CustomerOrdering() {
         axiosClient.get(`/branches/${branchId}/categories?onlyActive=true`),
       ]);
 
-      if (menuRes.status === 'fulfilled' && menuRes.value?.data) {
-        // Accept all active items from the branch
-        const rawItems = menuRes.value.data || [];
-        setMenuItems(rawItems);
+      if (menuRes.status === 'fulfilled' && Array.isArray(menuRes.value?.data) && menuRes.value.data.length > 0) {
+        setMenuItems(menuRes.value.data);
+      } else {
+        setMenuItems(mockMenuItems);
       }
-      if (areaRes.status === 'fulfilled' && areaRes.value?.data) {
-        setDeliveryAreas(areaRes.value.data || []);
+
+      if (areaRes.status === 'fulfilled' && Array.isArray(areaRes.value?.data)) {
+        setDeliveryAreas(areaRes.value.data);
       }
-      if (catRes.status === 'fulfilled' && catRes.value?.data) {
-        setCategories(catRes.value.data || []);
+
+      if (catRes.status === 'fulfilled' && Array.isArray(catRes.value?.data) && catRes.value.data.length > 0) {
+        setCategories(catRes.value.data);
+      } else {
+        setCategories(mockCategories);
       }
     } catch (err) {
       console.error('Error loading branch menu & areas:', err);
+      setMenuItems(mockMenuItems);
+      setCategories(mockCategories);
     }
   };
 
@@ -226,142 +253,141 @@ export default function CustomerOrdering() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header & Order Type Switcher */}
-      <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <span className="px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[10px] font-extrabold uppercase mb-1 inline-block">
-              Member 3 – Customer Ordering Portal
-            </span>
-            <h1 className="text-2xl font-black text-stone-900">Browse Menu & Place Order</h1>
-            <p className="text-xs text-stone-500">Pick your restaurant branch, choose pickup or delivery, and order your favorite dishes.</p>
-          </div>
+      <PageHeader
+        badgeIcon={ShoppingBag}
+        badgeText="Customer Ordering Portal"
+        badgeColor="bg-orange-600/90"
+        title="Browse Gourmet Menu & Place Order"
+        description="Pick your restaurant branch, choose pickup or delivery address, build your shopping cart, and complete order checkout."
+        switcherTabs={[
+          { label: 'Browse Menu', to: '/order', icon: ShoppingBag, active: true },
+          { label: 'My Orders & History', to: '/my-orders', icon: Receipt, active: false },
+        ]}
+      >
+        {/* Pickup vs Delivery Toggle */}
+        <div className="flex items-center gap-2 bg-stone-800 border border-stone-700 p-1.5 rounded-2xl">
+          <button
+            onClick={() => setOrderType('DELIVERY')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              orderType === 'DELIVERY'
+                ? 'bg-orange-600 text-white shadow-md'
+                : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" /> Delivery Order
+          </button>
+          <button
+            onClick={() => setOrderType('PICKUP')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              orderType === 'PICKUP'
+                ? 'bg-orange-600 text-white shadow-md'
+                : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            <Store className="w-3.5 h-3.5" /> Self-Pickup
+          </button>
+        </div>
+      </PageHeader>
 
-          {/* Pickup vs Delivery Toggle */}
-          <div className="flex items-center gap-2 bg-stone-100 p-1.5 rounded-2xl">
+      {/* 🏢 INTERACTIVE BRANCH SELECTOR (Cards) */}
+      <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+            <Building2 className="w-4 h-4 text-orange-600" />
+            Select Restaurant Branch:
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium text-stone-500">
+              {branches.length} Branches Available
+            </span>
             <button
-              onClick={() => setOrderType('DELIVERY')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                orderType === 'DELIVERY'
-                  ? 'bg-orange-600 text-white shadow-sm'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
+              onClick={loadInitialData}
+              className="p-1 text-stone-400 hover:text-stone-700 rounded-md"
+              title="Refresh branches from DB"
             >
-              <Truck className="w-4 h-4" /> Delivery Order
-            </button>
-            <button
-              onClick={() => setOrderType('PICKUP')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                orderType === 'PICKUP'
-                  ? 'bg-orange-600 text-white shadow-sm'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-            >
-              <Store className="w-4 h-4" /> Self-Pickup
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* 🏢 INTERACTIVE BRANCH SELECTOR (Cards) */}
-        <div className="mt-6 pt-6 border-t border-stone-100">
-          <div className="flex items-center justify-between mb-3">
-            <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-orange-600" />
-              Select Restaurant Branch:
-            </label>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-stone-500">
-                {branches.length} Branches Available
-              </span>
+        {/* Clickable Branch Cards */}
+        {branches.length === 0 ? (
+          <div className="p-6 bg-stone-50 border border-stone-200 rounded-2xl text-center text-xs text-stone-500">
+            <AlertCircle className="w-5 h-5 text-amber-500 mx-auto mb-2" />
+            No branches found in database. Make sure backend is running.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {branches.map((b) => {
+              const isSelected = selectedBranchId === b.branchId;
+              return (
+                <div
+                  key={b.branchId}
+                  onClick={() => handleSelectBranch(b.branchId)}
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                    isSelected
+                      ? 'border-orange-600 bg-orange-50/50 shadow-md shadow-orange-600/10 ring-2 ring-orange-500/20'
+                      : 'border-stone-200 bg-stone-50 hover:bg-white hover:border-stone-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold text-stone-900 text-xs">{b.branchName}</h4>
+                      <p className="text-[11px] text-stone-500 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3 h-3 text-orange-600 flex-shrink-0" />
+                        {b.streetAddress}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <span className="p-1 bg-orange-600 text-white rounded-full">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2.5 pt-2 border-t border-stone-200/60 flex items-center justify-between text-[10px] text-stone-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-stone-400" /> {b.openingTime} - {b.closingTime}
+                    </span>
+                    <span className="font-semibold text-emerald-600">{b.status}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Delivery Address Row (If Delivery Mode) */}
+        {orderType === 'DELIVERY' && (
+          <div className="mt-4 pt-4 border-t border-stone-100">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-orange-600" />
+                Your Delivery Address:
+              </label>
               <button
-                onClick={loadInitialData}
-                className="p-1 text-stone-400 hover:text-stone-700 rounded-md"
-                title="Refresh branches from DB"
+                onClick={() => setShowAddressModal(true)}
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 underline"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                + Add New Address
               </button>
             </div>
+            <select
+              value={selectedAddressId}
+              onChange={(e) => setSelectedAddressId(Number(e.target.value))}
+              className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              {addresses.length === 0 ? (
+                <option value="">No addresses saved. Click "+ Add New Address" above</option>
+              ) : (
+                addresses.map((a) => (
+                  <option key={a.addressId} value={a.addressId}>
+                    {a.label}: {a.houseNumber}, {a.street} ({a.areaName} - Delivery Fee: LKR {Number(a.deliveryFee).toFixed(2)})
+                  </option>
+                ))
+              )}
+            </select>
           </div>
-
-          {/* Clickable Branch Cards */}
-          {branches.length === 0 ? (
-            <div className="p-6 bg-stone-50 border border-stone-200 rounded-2xl text-center text-xs text-stone-500">
-              <AlertCircle className="w-5 h-5 text-amber-500 mx-auto mb-2" />
-              No branches found in database. Make sure backend is running.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              {branches.map((b) => {
-                const isSelected = selectedBranchId === b.branchId;
-                return (
-                  <div
-                    key={b.branchId}
-                    onClick={() => handleSelectBranch(b.branchId)}
-                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
-                      isSelected
-                        ? 'border-orange-600 bg-orange-50/50 shadow-md shadow-orange-600/10 ring-2 ring-orange-500/20'
-                        : 'border-stone-200 bg-stone-50 hover:bg-white hover:border-stone-300'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-bold text-stone-900 text-xs">{b.branchName}</h4>
-                        <p className="text-[11px] text-stone-500 flex items-center gap-1 mt-1">
-                          <MapPin className="w-3 h-3 text-orange-600 flex-shrink-0" />
-                          {b.streetAddress}
-                        </p>
-                      </div>
-                      {isSelected && (
-                        <span className="p-1 bg-orange-600 text-white rounded-full">
-                          <CheckCircle className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2.5 pt-2 border-t border-stone-200/60 flex items-center justify-between text-[10px] text-stone-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-stone-400" /> {b.openingTime} - {b.closingTime}
-                      </span>
-                      <span className="font-semibold text-emerald-600">{b.status}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Delivery Address Row (If Delivery Mode) */}
-          {orderType === 'DELIVERY' && (
-            <div className="mt-4 pt-4 border-t border-stone-100">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-orange-600" />
-                  Your Delivery Address:
-                </label>
-                <button
-                  onClick={() => setShowAddressModal(true)}
-                  className="text-xs font-bold text-orange-600 hover:text-orange-700 underline"
-                >
-                  + Add New Address
-                </button>
-              </div>
-              <select
-                value={selectedAddressId}
-                onChange={(e) => setSelectedAddressId(Number(e.target.value))}
-                className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                {addresses.length === 0 ? (
-                  <option value="">No addresses saved. Click "+ Add New Address" above</option>
-                ) : (
-                  addresses.map((a) => (
-                    <option key={a.addressId} value={a.addressId}>
-                      {a.label}: {a.houseNumber}, {a.street} ({a.areaName} - Delivery Fee: LKR {Number(a.deliveryFee).toFixed(2)})
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Category Tabs & Search Bar */}

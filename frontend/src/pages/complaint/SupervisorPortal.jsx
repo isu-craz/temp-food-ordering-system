@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axiosClient from '../../api/axiosClient';
 import StatusBadge from '../../components/StatusBadge';
+import PageHeader from '../../components/PageHeader';
 import { MessageSquareWarning, Star, CheckCircle, Clock, Check, AlertCircle, RefreshCw, BarChart3 } from 'lucide-react';
 
 export default function SupervisorPortal() {
@@ -66,25 +67,20 @@ export default function SupervisorPortal() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-900 text-[10px] font-extrabold uppercase">
-              Member 6 Module
-            </span>
-            <h1 className="text-2xl font-black text-stone-900">Customer Feedback & Complaint Management</h1>
-          </div>
-          <p className="text-xs text-stone-500">Resolve customer complaints, record solutions, and track satisfaction analytics.</p>
-        </div>
-
+      <PageHeader
+        badgeIcon={MessageSquareWarning}
+        badgeText="Customer Support Console"
+        badgeColor="bg-rose-600/90"
+        title="Feedback & Complaint Ticket Resolution"
+        description="Investigate order disputes, record resolution notes, close customer complaints, and monitor satisfaction ratings."
+      >
         <button
           onClick={fetchSupervisorData}
-          className="p-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl"
+          className="px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold rounded-2xl border border-stone-700 text-xs flex items-center gap-2 transition-all"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="w-4 h-4" /> Sync Tickets
         </button>
-      </div>
+      </PageHeader>
 
       {/* Analytics Summary Cards */}
       {analytics && (

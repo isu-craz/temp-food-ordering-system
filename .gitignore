@@ -1,26 +1,25 @@
-# IDE & Editor
-.idea/
-*.iml
-.vscode/
-*.swp
-*.swo
-
-# Backend build
-backend/target/
-target/
-*.class
-
-# Frontend build & dependencies
-frontend/node_modules/
+# Dependencies
 node_modules/
-frontend/dist/
-dist/
-.env.local
-.env.*.local
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+**/node_modules/
 
-# OS Files
-Thumbs.db
+# Build outputs
+dist/
+**/dist/
+target/
+**/target/
+build/
+**/build/
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Log files
+*.log
